@@ -8,51 +8,59 @@ while True:
     if not ret:
         break
 
+    # 원 검출을 위한 그레이스케일 변환
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray_blurred = cv2.GaussianBlur(gray, (9, 9), 2)
+
+    # 허프 원 변환으로 원 검출
+    circles = cv2.HoughCircles(gray_blurred,
+                               cv2.HOUGH_GRADIENT,
+                               dp=1.2,
+                               minDist=30,
+                               param1=100,
+                               param2=30,
+                               minRadius=5,
+                               maxRadius=100)
+
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    circle = cv2.GaussianBlur()
-
-    #색상범위설정(red)
-    lower_red1 = np.array([0, 150, 150])    #테두리
-    upper_red1 = np.array([5, 255, 255])
-    lower_red2 = np.array([170, 150, 150])
 
     
-    upper_red2 = np.array([179, 255, 255]) #중앙 흰점
-    lower_white = np.array([0, 0, 240]) 
+    lower_white = np.array([0, 0, 240])
     upper_white = np.array([180, 30, 255])
+    white_mask = cv2.inRange(hsv, lower_white, upper_white)
 
-    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-    mask3 = cv2.inRange(hsv, lower_white, upper_white)
-    mask4 = cv2.bitwise_or(mask1, mask2)
+    lower_red1 = np.array([0, 150, 150])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([170, 150, 150])
+    upper_red2 = np.array([180, 255, 255])
+    red_mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+    red_mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+    red_mask = cv2.bitwise_or(red_mask1, red_mask2)
 
-    mask = cv2.bitwise_or(mask3,mask4)
+    if circles is not None:
+        circles = np.uint16(np.around(circles))
+        for c in circles[0, :]:
+            x, y, r = c
+            center = (x, y)
 
-    mask = cv2.GaussianBlur(mask, (7, 7), 0)
-    
-    
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # 중심이 흰색인지 확인
+            if white_mask[y, x] == 255:
+                # 테두리에 빨간색이 있는지 확인 (원 경계 주변만 검사)
+                ring_mask = np.zeros_like(red_mask)
+                cv2.circle(ring_mask, center, r, 255, 5)  # 테두리만
 
-#houghcircles (허프원 변환 알고리즘)
+                red_ring_overlap = cv2.bitwise_and(red_mask, ring_mask)
+                red_pixels = cv2.countNonZero(red_ring_overlap)
 
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        if 10 < area < 300:
-            perimeter = cv2.arcLength(cnt, True)
-            circularity = 4 * np.pi * (area / (perimeter * perimeter + 1e-5))
-            if circularity > 0.7:  # 원형에 가까운 것만
-                (x,y), radius = cv2.minEnclosingCircle(cnt)
-                center = (int(x), int(y))
-                cv2.circle(frame, center, int(radius)+5, (0,255,0), 2)
-                cv2.putText(frame, "laser", (center[0]+10, center[1]),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                if red_pixels > 20:  # 일정 수 이상 빨간 픽셀 있을 경우
+                    cv2.circle(frame, center, r, (0, 255, 0), 2)
+                    cv2.putText(frame, "laser", (x + 10, y),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-            
     cv2.imshow('laser detection', frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-
 
 cap.release()
 cv2.destroyAllWindows()
