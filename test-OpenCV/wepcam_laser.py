@@ -8,11 +8,11 @@ while True:
     if not ret:
         break
 
-    # 원 검출을 위한 그레이스케일 변환
+   
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray_blurred = cv2.GaussianBlur(gray, (9, 9), 2)
 
-    # 허프 원 변환으로 원 검출
+    # 허프 원 변환
     circles = cv2.HoughCircles(gray_blurred,
                                cv2.HOUGH_GRADIENT,
                                dp=1.2,
